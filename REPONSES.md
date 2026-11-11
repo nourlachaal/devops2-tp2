@@ -57,3 +57,10 @@ Docker Compose interprète lui-même la syntaxe `${VARIABLE}` et la remplace par
 Dans le healthcheck, on veut que la variable soit résolue **à l'intérieur du conteneur**, par le shell, au moment où la commande `pg_isready` s'exécute. Le double `$$` est un **échappement** : Compose le transforme en un seul `$` littéral et ne le remplace pas. Le conteneur reçoit donc `pg_isready -U ${POSTGRES_USER} -d ${POSTGRES_DB}` et son shell utilise les variables d'environnement du conteneur.
 
 Avec un seul `$`, c'est Compose qui substituerait la valeur du `.env` dès le départ, ce qui ne garantit pas que ce soit la même valeur que celle vue dans le conteneur.
+## Partie 3 — pgAdmin
+
+### Q5. `"Host": "postgres"`, `:ro` et `${PGADMIN_PORT:-5050}`
+
+- **`"Host": "postgres"`** : pgAdmin tourne dans son propre conteneur. Il joint PostgreSQL via le réseau Docker, où le nom du service (`postgres`) est résolu par le DNS interne de Compose. `localhost` désignerait le conteneur pgAdmin lui-même.
+- **`:ro`** (*read-only*) : le fichier `servers.json` est monté en **lecture seule** dans le conteneur. pgAdmin peut le lire pour pré-enregistrer le serveur, mais ne peut pas le modifier, ce qui protège le fichier de l'hôte.
+- **`${PGADMIN_PORT:-5050}`** : syntaxe de valeur par défaut. Compose utilise la valeur de `PGADMIN_PORT` si elle est définie et non vide dans `.env`, sinon il utilise `5050`. Le port 5050 de l'hôte est redirigé vers le port 80 du conteneur.
