@@ -90,3 +90,36 @@ Sans cette condition (ou avec un simple `depends_on` sans condition), Compose at
 Dans pgAdmin (Databases → strapi → Schemas → public → Tables → articles), j'ai trouvé [N] lignes pour un article publié. [Explication : avec Draft & Publish de Strapi 5, une ligne correspond à la version brouillon et une autre à la version publiée du même document (même `document_id`).]
 
 Capture : `screenshots/pgadmin-articles.png` 
+## Partie 5 — Next.js
+
+### Q10. Pourquoi `STRAPI_URL=http://localhost:1337` ne fonctionnerait-il pas dans le conteneur ?
+
+Le code de `page.tsx` s'exécute **côté serveur, dans le conteneur `frontend`**. Dans ce conteneur, `localhost` désigne le conteneur frontend lui-même, où rien n'écoute sur le port 1337. Strapi tourne dans un autre conteneur. Il faut utiliser le **nom du service** (`http://strapi:1337`), que le DNS interne de Docker Compose résout vers l'adresse du conteneur Strapi.
+
+### Q11. Dockerfile multi-stage et sortie `standalone`
+
+- **Nombre d'étapes :** 3 `FROM` (`deps`, `builder`, `runner`).
+- **Contenu de l'image finale :** uniquement le dossier `public/`, le serveur autonome `.next/standalone` (serveur Node minimal avec seulement les dépendances nécessaires) et `.next/static`. Les `node_modules` complets, les sources et les outils de build ne sont pas inclus.
+- **Taille de l'image finale :** [taille relevée avec `docker images tp2/frontend`].
+- **Sans `output: "standalone"` :** le `next build` réussit mais le build Docker échoue à l'étape `COPY --from=builder /app/.next/standalone ./` : [message d'erreur relevé]. En effet, le dossier `.next/standalone` n'est généré que lorsque cette option est activée.
+
+Capture : `screenshots/frontend-articles.png`
+## Partie 6 — Réseaux et sécurité
+
+### Q12. Pourquoi `strapi` est-il dans les deux réseaux ? Pourquoi ne publier aucun port pour `postgres` ?
+
+- **Strapi dans les deux réseaux :** il fait le pont entre les deux zones. Il doit joindre PostgreSQL (réseau `backend`) et être joignable par le frontend (réseau `frontend`). Le frontend, lui, n'est que dans `frontend` : il ne peut parler qu'à Strapi et ne voit pas la base de données.
+- **Aucun port publié pour `postgres` :** la base n'est accessible que par les conteneurs du réseau `backend`, et pas depuis la machine hôte ni depuis l'extérieur. Cela réduit la **surface d'attaque** : on ne peut pas tenter de se connecter directement à la base depuis le réseau.
+
+**Vérification :** depuis le conteneur `frontend`, la connexion à `postgres:5432` échoue ([sortie relevée]), alors que `http://strapi:1337/_health` répond OK.
+
+### Q13. Deux mesures pour durcir la stack en production
+
+1. **Gérer les secrets proprement** : régénérer chaque secret (`openssl rand -base64 16`) et utiliser des Docker secrets ou un gestionnaire de secrets plutôt qu'un fichier `.env` en clair.
+2. **Placer un reverse proxy HTTPS** (Nginx, Traefik) devant la stack, ne plus exposer directement Strapi et pgAdmin, et chiffrer le trafic avec TLS.
+
+D'autres mesures possibles : épingler les versions des images (pas de `latest`), scanner les images, définir des limites de ressources, ne pas exposer pgAdmin.
+OK
+50b60f145e0c   tp2_backend             bridge    local
+2a8b9d2b0006   tp2_default             bridge    local
+7968ac66aa3d   tp2_frontend            bridge    local
