@@ -64,3 +64,29 @@ Avec un seul `$`, c'est Compose qui substituerait la valeur du `.env` dès le d�
 - **`"Host": "postgres"`** : pgAdmin tourne dans son propre conteneur. Il joint PostgreSQL via le réseau Docker, où le nom du service (`postgres`) est résolu par le DNS interne de Compose. `localhost` désignerait le conteneur pgAdmin lui-même.
 - **`:ro`** (*read-only*) : le fichier `servers.json` est monté en **lecture seule** dans le conteneur. pgAdmin peut le lire pour pré-enregistrer le serveur, mais ne peut pas le modifier, ce qui protège le fichier de l'hôte.
 - **`${PGADMIN_PORT:-5050}`** : syntaxe de valeur par défaut. Compose utilise la valeur de `PGADMIN_PORT` si elle est définie et non vide dans `.env`, sinon il utilise `5050`. Le port 5050 de l'hôte est redirigé vers le port 80 du conteneur.
+## Partie 4 — Strapi
+
+### Q6. Pourquoi copier `package*.json` et lancer `npm ci` avant le reste du code ?
+
+Docker construit l'image par **couches** et met chaque couche en **cache** tant que ses entrées n'ont pas changé. En copiant d'abord uniquement `package.json` et `package-lock.json`, la couche `npm ci` (longue, qui télécharge les dépendances) n'est rejouée que si les dépendances changent. Si on ne modifie que le code source, `npm ci` est réutilisé depuis le cache et le build est beaucoup plus rapide.
+
+**Test effectué :** j'ai ajouté un commentaire dans `backend/config/server.js` et relancé le build.
+- Étapes en cache (`CACHED`) : [image de base, WORKDIR, COPY package*.json, RUN npm ci, ...]
+- Étapes rejouées : [COPY . ., RUN npm run build, COPY --from=build ...]
+
+### Q7. À quoi servent `USER node` et `--chown=node:node` ?
+
+- `USER node` : le processus Strapi s'exécute avec l'utilisateur non privilégié `node` au lieu de `root`. C'est le principe du **moindre privilège** : si l'application est compromise, l'attaquant a des droits limités dans le conteneur.
+- `--chown=node:node` : les fichiers copiés depuis l'étape de build appartiennent par défaut à `root`. Cette option les donne à l'utilisateur `node`, qui peut ainsi les lire et écrire (par exemple les dossiers temporaires et les uploads) sans être root.
+
+### Q8. Que fait `depends_on: condition: service_healthy` ?
+
+Il indique à Compose de **ne démarrer `strapi` que lorsque le healthcheck de `postgres` est au statut `healthy`**, c'est-à-dire quand la base accepte réellement les connexions, et pas seulement quand le conteneur est lancé.
+
+Sans cette condition (ou avec un simple `depends_on` sans condition), Compose attendrait juste que le conteneur PostgreSQL soit démarré. Strapi risquerait de tenter de se connecter alors que la base s'initialise encore, ce qui provoque des erreurs de connexion et un plantage ou des redémarrages.
+
+### Q9. Table `articles` dans pgAdmin
+
+Dans pgAdmin (Databases → strapi → Schemas → public → Tables → articles), j'ai trouvé [N] lignes pour un article publié. [Explication : avec Draft & Publish de Strapi 5, une ligne correspond à la version brouillon et une autre à la version publiée du même document (même `document_id`).]
+
+Capture : `screenshots/pgadmin-articles.png`
