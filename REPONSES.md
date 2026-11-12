@@ -89,4 +89,4 @@ Sans cette condition (ou avec un simple `depends_on` sans condition), Compose at
 
 Dans pgAdmin (Databases → strapi → Schemas → public → Tables → articles), j'ai trouvé [N] lignes pour un article publié. [Explication : avec Draft & Publish de Strapi 5, une ligne correspond à la version brouillon et une autre à la version publiée du même document (même `document_id`).]
 
-Capture : `screenshots/pgadmin-articles.png`
+Capture : `screenshots/pgadmin-articles.png` 

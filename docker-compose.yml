@@ -70,7 +70,19 @@ services:
       timeout: 5s
       retries: 12
       start_period: 30s
-
+  # ---------------- Front-end ----------------
+  frontend:
+    build: ./frontend
+    image: tp2/frontend:latest
+    restart: unless-stopped
+    environment:
+      # Appel serveur à serveur : on utilise le nom du service, pas "localhost"
+      STRAPI_URL: http://strapi:1337
+    ports:
+      - "${FRONTEND_PORT:-3000}:3000"
+    depends_on:
+      strapi:
+        condition: service_healthy
 volumes:
   pgdata:
   pgadmin-data:
