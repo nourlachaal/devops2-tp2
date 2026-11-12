@@ -123,3 +123,21 @@ OK
 50b60f145e0c   tp2_backend             bridge    local
 2a8b9d2b0006   tp2_default             bridge    local
 7968ac66aa3d   tp2_frontend            bridge    local
+## Partie 7 — Cycle de vie
+
+### Observations
+
+- **Persistance :** après `docker compose down` puis `up -d`, les articles étaient toujours présents (le volume `pgdata` est conservé). Après `docker compose down -v`, ils avaient disparu et il a fallu recréer le compte administrateur, les articles et les permissions.
+- **Sauvegarde :** `pg_dump` exécuté dans le conteneur postgres a produit le fichier `backup.sql`.
+- **Rebuild ciblé :** après modification du `<h1>`, `docker compose up -d --build frontend` n'a reconstruit que le service frontend ; le titre a changé sur http://localhost:3000.
+- **Panne :** après `docker compose stop strapi`, le frontend affiche : [message observé]. Après `docker compose start strapi`, le site réaffiche les articles.
+
+### Q14. Que fait `restart: unless-stopped` ? Pourquoi `strapi` ne redémarre-t-il pas après `docker compose stop` ?
+
+`restart: unless-stopped` demande à Docker de **redémarrer automatiquement le conteneur** quand il s'arrête, **sauf s'il a été arrêté manuellement**.
+
+Après `docker compose stop strapi` (ou `kill`), c'est une action volontaire de l'utilisateur : Docker considère l'arrêt comme voulu et ne relance pas le conteneur.
+
+Docker le redémarre automatiquement dans ces cas :
+- le processus **plante** (code de sortie différent de 0) ;
+- le **démon Docker redémarre** (par exemple au redémarrage de la machine), tant que le conteneur n'avait pas été arrêté manuellement.
